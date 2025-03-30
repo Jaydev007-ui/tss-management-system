@@ -284,6 +284,9 @@ def approve_purchase_requests():
     conn.close()
 
 # ==================== MAIN APP ====================
+
+      # ... (previous imports remain the same) ...
+
 def main():
     st.set_page_config(page_title="Tech Social Shield", page_icon="🛡️", layout="wide")
     if 'logged_in' not in st.session_state:
@@ -293,6 +296,14 @@ def main():
         login_page()
     else:
         st.sidebar.title(f"Welcome, {st.session_state['fullname']}")
+        
+        # Add logout button at the top of sidebar
+        if st.sidebar.button("🚪 Logout"):
+            st.session_state['logged_in'] = False
+            st.session_state.pop('username', None)
+            st.session_state.pop('fullname', None)
+            st.rerun()
+        
         notification_bell()
         menu = ["Dashboard", "Upload Documents", "View Documents", "Achievements", 
                 "Add Achievement", "Purchase Request", "View Purchase Requests"]
@@ -309,6 +320,8 @@ def main():
         elif choice == "Purchase Request": purchase_request()
         elif choice == "View Purchase Requests": view_purchase_requests()
         elif choice == "Approve Purchase Requests": approve_purchase_requests()
+
+# ... (rest of the code remains identical) ...
 
 if __name__ == "__main__":
     main()
