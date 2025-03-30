@@ -237,7 +237,7 @@ def show_dashboard():
     
     # Company logo at bottom
     st.markdown("---")
-    logo_path = st.text_input("Enter path to company logo", "logo.png")
+    logo_path = st.text_input("Enter path to company logo", "tss.jpg")
     
     try:
         logo = Image.open(logo_path)
