@@ -1,0 +1,6 @@
+streamlit
+Pillow
+pandas
+streamlit-calendar
+email-validator
+python-dotenv
