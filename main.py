@@ -171,7 +171,7 @@ def show_dashboard():
 # ==================== DOCUMENT MANAGEMENT ====================
 def upload_documents():
     st.title("Upload Documents")
-    uploaded_file = st.file_uploader("Choose a file", type=['pdf', 'docx', 'txt', 'xlsx', 'pptx'])
+    uploaded_file = st.file_uploader("Choose a file", type=['pdf', 'docx', 'txt', 'xlsx', 'pptx', 'png', 'jpg', 'jpeg'])
     if uploaded_file and st.button("Upload"):
         conn = sqlite3.connect('tss_management.db')
         c = conn.cursor()
@@ -185,11 +185,46 @@ def view_documents():
     st.title("View Documents")
     conn = sqlite3.connect('tss_management.db')
     c = conn.cursor()
-    c.execute("SELECT id, filename, uploaded_by, upload_date FROM documents ORDER BY upload_date DESC")
-    for doc in c.fetchall():
+    
+    # Search functionality
+    search_term = st.text_input("Search documents by name")
+    if search_term:
+        c.execute("SELECT id, filename, uploaded_by, upload_date FROM documents WHERE filename LIKE ? ORDER BY upload_date DESC", 
+                 (f"%{search_term}%",))
+    else:
+        c.execute("SELECT id, filename, uploaded_by, upload_date FROM documents ORDER BY upload_date DESC")
+    
+    documents = c.fetchall()
+    
+    if not documents:
+        st.info("No documents found")
+        return
+    
+    for doc in documents:
         with st.expander(f"{doc[1]} (Uploaded by {doc[2]} on {doc[3]})"):
-            c.execute("SELECT file_data FROM documents WHERE id=?", (doc[0],))
-            st.download_button("Download", data=c.fetchone()[0], file_name=doc[1])
+            col1, col2 = st.columns([3,1])
+            
+            # Download button
+            with col1:
+                c.execute("SELECT file_data FROM documents WHERE id=?", (doc[0],))
+                file_data = c.fetchone()[0]
+                st.download_button(
+                    label="Download",
+                    data=file_data,
+                    file_name=doc[1],
+                    mime="application/octet-stream",
+                    key=f"download_{doc[0]}"
+                )
+            
+            # Delete button (only for uploader or admin)
+            with col2:
+                if st.session_state['username'] == doc[2] or st.session_state['username'] == 'kush':
+                    if st.button("Delete", key=f"delete_{doc[0]}"):
+                        c.execute("DELETE FROM documents WHERE id=?", (doc[0],))
+                        conn.commit()
+                        st.success("Document deleted successfully!")
+                        st.rerun()
+    
     conn.close()
 
 # ==================== ACHIEVEMENTS ====================
