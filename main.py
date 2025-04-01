@@ -47,6 +47,15 @@ def init_db():
                   timestamp TEXT,
                   seen BOOLEAN DEFAULT 0)''')
     
+    c.execute('''CREATE TABLE IF NOT EXISTS certificates
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                  title TEXT,
+                  recipient TEXT,
+                  file_name TEXT, 
+                  file_data BLOB, 
+                  uploaded_by TEXT, 
+                  upload_date TEXT)''')
+    
     users = [
         ('jaydev', 'zala', 'Jaydev Zala'),
         ('kush', 'jani', 'Kush Jani'),
@@ -318,10 +327,78 @@ def approve_purchase_requests():
                 st.rerun()
     conn.close()
 
+# ==================== CERTIFICATE MANAGEMENT ====================
+def upload_certificate():
+    st.title("Upload Certificate")
+    with st.form("certificate_form"):
+        title = st.text_input("Certificate Title")
+        recipient = st.text_input("Recipient Name", value=st.session_state['fullname'])
+        uploaded_file = st.file_uploader("Choose certificate file", type=['pdf', 'jpg', 'jpeg', 'png'])
+        
+        if st.form_submit_button("Upload") and title and uploaded_file:
+            conn = sqlite3.connect('tss_management.db')
+            c = conn.cursor()
+            c.execute("""INSERT INTO certificates 
+                         (title, recipient, file_name, file_data, uploaded_by, upload_date) 
+                         VALUES (?, ?, ?, ?, ?, ?)""",
+                      (title, recipient, uploaded_file.name, uploaded_file.read(), 
+                       st.session_state['fullname'], datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            conn.commit()
+            conn.close()
+            st.success("Certificate uploaded successfully!")
+
+def view_certificates():
+    st.title("View Certificates")
+    conn = sqlite3.connect('tss_management.db')
+    c = conn.cursor()
+    
+    # Search functionality
+    search_term = st.text_input("Search certificates by title or recipient")
+    if search_term:
+        c.execute("""SELECT id, title, recipient, file_name, uploaded_by, upload_date 
+                     FROM certificates 
+                     WHERE title LIKE ? OR recipient LIKE ?
+                     ORDER BY upload_date DESC""", 
+                 (f"%{search_term}%", f"%{search_term}%"))
+    else:
+        c.execute("""SELECT id, title, recipient, file_name, uploaded_by, upload_date 
+                     FROM certificates 
+                     ORDER BY upload_date DESC""")
+    
+    certificates = c.fetchall()
+    
+    if not certificates:
+        st.info("No certificates found")
+        return
+    
+    for cert in certificates:
+        with st.expander(f"{cert[1]} - Awarded to {cert[2]} (Uploaded by {cert[4]} on {cert[5]})"):
+            col1, col2 = st.columns([3,1])
+            
+            # Download button
+            with col1:
+                c.execute("SELECT file_data FROM certificates WHERE id=?", (cert[0],))
+                file_data = c.fetchone()[0]
+                st.download_button(
+                    label="Download Certificate",
+                    data=file_data,
+                    file_name=cert[3],
+                    mime="application/octet-stream",
+                    key=f"download_cert_{cert[0]}"
+                )
+            
+            # Delete button (only for uploader or admin)
+            with col2:
+                if st.session_state['username'] == cert[4] or st.session_state['username'] == 'kush':
+                    if st.button("Delete", key=f"delete_cert_{cert[0]}"):
+                        c.execute("DELETE FROM certificates WHERE id=?", (cert[0],))
+                        conn.commit()
+                        st.success("Certificate deleted successfully!")
+                        st.rerun()
+    
+    conn.close()
+
 # ==================== MAIN APP ====================
-
-      # ... (previous imports remain the same) ...
-
 def main():
     st.set_page_config(page_title="Tech Social Shield", page_icon="🛡️", layout="wide")
     if 'logged_in' not in st.session_state:
@@ -341,7 +418,9 @@ def main():
         
         notification_bell()
         menu = ["Dashboard", "Upload Documents", "View Documents", "Achievements", 
-                "Add Achievement", "Purchase Request", "View Purchase Requests"]
+                "Add Achievement", "Purchase Request", "View Purchase Requests",
+                "Upload Certificate", "View Certificates"]
+        
         if st.session_state.get('username') == 'kush':
             menu.append("Approve Purchase Requests")
         
@@ -355,8 +434,8 @@ def main():
         elif choice == "Purchase Request": purchase_request()
         elif choice == "View Purchase Requests": view_purchase_requests()
         elif choice == "Approve Purchase Requests": approve_purchase_requests()
-
-# ... (rest of the code remains identical) ...
+        elif choice == "Upload Certificate": upload_certificate()
+        elif choice == "View Certificates": view_certificates()
 
 if __name__ == "__main__":
     main()
